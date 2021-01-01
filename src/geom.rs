@@ -1,4 +1,4 @@
-use std::ops::Sub;
+use std::ops::{Sub, AddAssign};
 
 pub type Scalar = f32;
 
@@ -42,6 +42,13 @@ impl Size {
 
     pub fn zero() -> Size {
         Size::new(0.0, 0.0)
+    }
+}
+
+impl AddAssign for Size {
+    fn add_assign(&mut self, rhs: Self) {
+        self.width += rhs.width;
+        self.height += rhs.height;
     }
 }
 

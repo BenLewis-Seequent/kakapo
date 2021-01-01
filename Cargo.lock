@@ -696,6 +696,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "kakapo"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "fs_extra",
+ "futures",
+ "glob",
+ "shaderc",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "kernel32-sys"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1123,20 +1137,6 @@ name = "redox_syscall"
 version = "0.1.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41cc0f7e4d5d4544e8861606a285bb08d3e70712ccc7d2b84d7c0ccfaf4b05ce"
-
-[[package]]
-name = "rust-ui-2"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytemuck",
- "fs_extra",
- "futures",
- "glob",
- "shaderc",
- "wgpu",
- "winit",
-]
 
 [[package]]
 name = "rusttype"

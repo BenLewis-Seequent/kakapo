@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::view::{View, WidgetTree};
 use crate::renderer::Renderer;
 use winit::platform::unix::EventLoopExtUnix;
+use crate::geom::{Rect, Position};
 
 
 pub struct AppBuilder {
@@ -80,10 +81,13 @@ struct Window {
 
 impl Window {
     fn create(
-        root: WidgetTree,
+        mut root: WidgetTree,
         window_target: &winit::event_loop::EventLoopWindowTarget<()>
     ) -> Window {
-        let logical_size = winit::dpi::LogicalSize::new(900.0, 600.0);
+        root.materialise_views();
+        let size = root.size_hint();
+        root.set_rect(Rect::new(Position::zero(), size));
+        let logical_size = winit::dpi::LogicalSize::new(size.width, size.height);
         let winit_window = winit::window::WindowBuilder::new()
             .with_title("Kakapo")
             .with_inner_size(logical_size)

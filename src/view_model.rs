@@ -31,7 +31,3 @@ impl<S> ViewModel<S> {
 pub struct ViewModelRef<S> {
     inner: Weak<ViewModelInner<S>>
 }
-
-pub struct ButtonViewModel {
-
-}

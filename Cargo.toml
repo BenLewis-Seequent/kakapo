@@ -1,5 +1,5 @@
 [package]
-name = "rust-ui-2"
+name = "kakapo"
 version = "0.1.0"
 authors = ["Ben Lewis <benlewisj@gmail.com>"]
 edition = "2018"
