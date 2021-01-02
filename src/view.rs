@@ -7,31 +7,68 @@ use crate::events::Event;
 
 struct ViewData<V: View + ?Sized> {
     widget: Option<WidgetTree>,
+    user_data: Option<Box<dyn Any>>,
     view: V
 }
 
-pub struct WidgetState {
-    allocation: Option<Rect>,
-    children: Vec<WidgetTree>
+pub type UserData<'a> = Option<&'a dyn Any>;
+pub type UserDataMut<'a> = Option<&'a mut dyn Any>;
+
+pub struct WidgetState<'a> {
+    rect: Rect,
+    user_data: UserData<'a>,
 }
 
-impl WidgetState {
+impl<'a> WidgetState<'a> {
     pub fn rect(&self) -> Rect {
-        self.allocation.unwrap()
+        self.rect
     }
 
     pub fn local_rect(&self) -> Rect {
         let rect = self.rect();
         Rect::new(Position::zero(), rect.size)
     }
+
+    pub fn user_data(&self) -> UserData<'_> {
+        match self.user_data {
+            Some(ref data) => Some(*data),
+            None => None
+        }
+    }
 }
 
+pub struct WidgetStateMut<'a> {
+    rect: Rect,
+    user_data: UserDataMut<'a>,
+}
+
+impl<'a> WidgetStateMut<'a> {
+    pub fn rect(&self) -> Rect {
+        self.rect
+    }
+
+    pub fn local_rect(&self) -> Rect {
+        let rect = self.rect();
+        Rect::new(Position::zero(), rect.size)
+    }
+
+    pub fn user_data(&mut self) -> UserDataMut<'_> {
+        match self.user_data {
+            Some(ref mut data) => Some(*data),
+            None => None
+        }
+    }
+}
+
+
 struct WidgetData<W: Widget + ?Sized> {
-    state: WidgetState,
+    allocation: Option<Rect>,
+    children: Vec<WidgetTree>,
     widget: W,
 }
 
 struct LayoutData<L: Layout + ?Sized> {
+    allocation: Option<Rect>,
     children: Vec<WidgetTree>,
     layout: L
 }
@@ -53,25 +90,25 @@ impl WidgetTree {
         }
     }
 
-    pub fn new_view<V: View + 'static>(view: V) -> WidgetTree {
+    pub fn new_view<V: View + 'static, D: 'static>(view: V, user_data: D) -> WidgetTree {
         WidgetTree::new(WidgetTreeInner::View(Box::new(ViewData {
             widget: None,
+            user_data: Some(Box::new(user_data) as Box<dyn Any>),
             view
         }) as Box<ViewData<dyn View>>))
     }
 
     pub fn new_widget<W: Widget + 'static>(widget: W) -> WidgetTree {
         WidgetTree::new(WidgetTreeInner::Widget(Box::new(WidgetData {
-            state: WidgetState {
-                allocation: None,
-                children: Vec::new(),
-            },
+            allocation: None,
+            children: Vec::new(),
             widget
         }) as Box<WidgetData<dyn Widget>>))
     }
 
     pub fn new_layout<L: Layout + 'static>(layout: L, children: Vec<WidgetTree>) -> WidgetTree {
         WidgetTree::new(WidgetTreeInner::Layout(Box::new(LayoutData {
+            allocation: None,
             children,
             layout
         }) as Box<LayoutData<dyn Layout>>))
@@ -87,7 +124,7 @@ impl WidgetTree {
                 }
             }
             WidgetTreeInner::Widget(ref mut w) => {
-                for child in w.state.children.iter_mut() {
+                for child in w.children.iter_mut() {
                     child.materialise_views();
                 }
             },
@@ -99,27 +136,29 @@ impl WidgetTree {
         }
     }
 
-    fn find_widget_at(&mut self, pos: Position,
-                      func: &mut Option<impl FnOnce(&mut WidgetData<dyn Widget>, Position)>) {
+    fn find_widget_at(&mut self,
+                      pos: Position,
+                      user_data: UserDataMut<'_>,
+                      func: impl FnOnce(&mut WidgetData<dyn Widget>, UserDataMut<'_>, Position)) {
         match self.inner {
             WidgetTreeInner::View(ref mut view) => {
                 if let Some(w) = &mut view.widget {
-                    w.find_widget_at(pos, func)
+                    w.find_widget_at(pos, view.user_data.as_deref_mut().or(user_data), func)
                 } else {
                     panic!("View widget is None when processing event");
                 }
             }
             WidgetTreeInner::Widget(ref mut w) => {
                 // TODO child widgets
-                let rect = w.state.rect();
+                let rect = w.allocation.unwrap();
                 if rect.contains(pos) {
-                    func.take().unwrap()(w, pos - rect.origin);
+                    func(w, user_data, pos - rect.origin);
                 }
             },
             WidgetTreeInner::Layout(ref mut layout) => {
                 for child in layout.children.iter_mut() {
-                    child.find_widget_at(pos, func);
-                    if func.is_none() {
+                    if child.rect().contains(pos) {
+                        child.find_widget_at(pos, user_data, func);
                         break;
                     }
                 }
@@ -127,35 +166,61 @@ impl WidgetTree {
         }
     }
 
+    fn position_event(&mut self, pos: Position, event_constructor: impl FnOnce(Position) -> Event) {
+        self.find_widget_at(pos, None, |w, user_data, pos| {
+            let state = WidgetStateMut {
+                rect: w.allocation.unwrap(),
+                user_data
+            };
+            w.widget.event(state, event_constructor(pos));
+        });
+    }
+
     pub(crate) fn event(&mut self, event: Event) {
         match event {
-            Event::MousePress(pos) => {
-                self.find_widget_at(pos, &mut Some(|w: &mut WidgetData<dyn Widget>, pos: Position|
-                    w.widget.event(&mut w.state, Event::MousePress(pos))))
-            },
-            Event::MouseRelease(pos) => {
-                self.find_widget_at(pos, &mut Some(|w: &mut WidgetData<dyn Widget>, pos: Position|
-                    w.widget.event(&mut w.state, Event::MouseRelease(pos))))
-            }
+            Event::MousePress(pos) => self.position_event(pos, |pos| Event::MousePress(pos)),
+            Event::MouseRelease(pos) => self.position_event(pos, |pos| Event::MouseRelease(pos)),
         }
     }
 
-    pub(crate) fn paint(&mut self, painter: &mut Painter<'_>) {
+    pub(crate) fn paint(&mut self, user_data: UserData<'_>, painter: &mut Painter<'_>) {
         match self.inner {
             WidgetTreeInner::View(ref mut view) => {
                 if let Some(w) = &mut view.widget {
-                    w.paint(painter)
+                    w.paint(view.user_data.as_deref().or(user_data), painter)
                 } else {
                     panic!("View widget is None when painting");
                 }
             }
             WidgetTreeInner::Widget(ref w) => {
-                w.widget.paint(&w.state, &mut painter.with_rect(w.state.rect()));
+                let state = WidgetState {
+                    rect: w.allocation.unwrap(),
+                    user_data
+                };
+                w.widget.paint(state, &mut painter.with_rect(w.allocation.unwrap()));
             },
             WidgetTreeInner::Layout(ref mut layout) => {
                 for child in layout.children.iter_mut() {
-                    child.paint(painter);
+                    child.paint(user_data, painter);
                 }
+            }
+        }
+    }
+
+    fn rect(&self) -> Rect {
+        match self.inner {
+            WidgetTreeInner::View(ref view) => {
+                if let Some(w) = &view.widget {
+                    w.rect()
+                } else {
+                    panic!("View widget is None when querying rect");
+                }
+            }
+            WidgetTreeInner::Widget(ref w) => {
+                w.allocation.unwrap()
+            },
+            WidgetTreeInner::Layout(ref layout) => {
+                layout.allocation.unwrap()
             }
         }
     }
@@ -171,9 +236,10 @@ impl WidgetTree {
                 }
             }
             WidgetTreeInner::Widget(ref mut w) => {
-                w.state.allocation = Some(rect);
+                w.allocation = Some(rect);
             },
             WidgetTreeInner::Layout(ref mut layout) => {
+                layout.allocation = Some(rect);
                 // TODO pass rect origin, probably encapsulate it in a layout context
                 layout.layout.layout(layout.children.as_mut_slice(), rect.size);
             }
@@ -191,7 +257,7 @@ impl WidgetTree {
                 }
             }
             WidgetTreeInner::Widget(ref w) => {
-                w.widget.size_hint(w.state.children.as_slice())
+                w.widget.size_hint(w.children.as_slice())
             },
             WidgetTreeInner::Layout(ref layout) => {
                 layout.layout.size_hint(layout.children.as_slice())
@@ -201,9 +267,9 @@ impl WidgetTree {
 }
 
 pub trait Widget {
-    fn event(&mut self, state: &mut WidgetState, event: Event);
+    fn event(&mut self, state: WidgetStateMut<'_>, event: Event);
 
-    fn paint(&self, state: &WidgetState, painter: &mut Painter);
+    fn paint(&self, state: WidgetState<'_>, painter: &mut Painter);
 
     fn size_hint(&self, children: &[WidgetTree]) -> Size;
 }

@@ -20,8 +20,8 @@ impl AppBuilder {
         }
     }
 
-    pub fn add_window<V: View + 'static>(&mut self, root: V) {
-        let window = Window::create(WidgetTree::new_view(root),
+    pub fn add_window<V: View + 'static, D: 'static>(&mut self, root: V, user_data: D) {
+        let window = Window::create(WidgetTree::new_view(root, user_data),
                                     &self.event_loop);
         self.windows.insert(window.window_id(), window);
     }
@@ -129,7 +129,7 @@ impl Window {
 
     pub(crate) fn paint(&mut self) {
         let root = &mut self.root;
-        match self.renderer.render(self.window.scale_factor(), |painter| root.paint(painter)) {
+        match self.renderer.render(self.window.scale_factor(), |painter| root.paint(None, painter)) {
             Ok(_) => {}
             Err(wgpu::SwapChainError::Lost) => self.renderer.recreate(),
             Err(wgpu::SwapChainError::OutOfMemory) => panic!("swapchain: out of memory"),

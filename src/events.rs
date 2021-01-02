@@ -50,7 +50,7 @@ impl EventState {
                 state: winit::event::ElementState::Released,
                 ..
             } => {
-                root.event(Event::MousePress(self.cursor_logical_position()));
+                root.event(Event::MouseRelease(self.cursor_logical_position()));
             }
             _ => {}
         }

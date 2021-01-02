@@ -1,42 +1,59 @@
 use std::any::Any;
 
-use crate::view::{Description, WidgetTree, Widget, WidgetCache, WidgetState};
+use crate::view::{Description, WidgetTree, Widget, WidgetCache, WidgetState, WidgetStateMut, UserDataMut};
 use crate::renderer::painter::Painter;
 use crate::geom::Size;
 use crate::events::Event;
 
-pub struct Button {
-    colour: [f32; 4]
+// TODO remove copy bound
+pub trait ButtonDelegate : Copy {
+    fn pressed(&mut self, parent: UserDataMut<'_>);
 }
 
-impl Button {
-    pub fn new(colour: [f32; 4]) -> Button {
+pub struct Button<D: ButtonDelegate + 'static> {
+    colour: [f32; 4],
+    delegate: D
+}
+
+impl<D: ButtonDelegate + 'static> Button<D> {
+    pub fn new(colour: [f32; 4], delegate: D) -> Self {
         Button {
-            colour
+            colour,
+            delegate
         }
     }
 }
 
-impl Description for Button {
+impl<D: ButtonDelegate + 'static> Description for Button<D> {
     fn apply(&self, obj: &mut dyn Any) {
 
     }
 
     fn create(&self, _: &mut WidgetCache) -> WidgetTree {
-        WidgetTree::new_widget(ButtonWidget { colour: self.colour })
+        WidgetTree::new_widget(ButtonWidget {
+            colour: self.colour,
+            delegate: self.delegate
+        })
     }
 }
 
 
-struct ButtonWidget {
-    colour: [f32; 4]
+struct ButtonWidget<D: ButtonDelegate> {
+    colour: [f32; 4],
+    delegate: D
 }
 
-impl Widget for ButtonWidget {
-    fn event(&mut self, state: &mut WidgetState, event: Event) {
+impl<D: ButtonDelegate> Widget for ButtonWidget<D> {
+    fn event(&mut self, mut state: WidgetStateMut<'_>, event: Event) {
+        match event {
+            Event::MousePress(_) => {
+                self.delegate.pressed(state.user_data())
+            }
+            _ => {}
+        }
     }
 
-    fn paint(&self, state: &WidgetState, painter: &mut Painter) {
+    fn paint(&self, state: WidgetState<'_>, painter: &mut Painter) {
         painter.paint_quad(state.local_rect(), self.colour);
     }
 
