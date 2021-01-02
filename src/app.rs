@@ -123,7 +123,7 @@ impl Window {
 
     pub(crate) fn paint(&mut self) {
         let root = &mut self.root;
-        match self.renderer.render(|painter| root.paint(painter)) {
+        match self.renderer.render(self.window.scale_factor(), |painter| root.paint(painter)) {
             Ok(_) => {}
             Err(wgpu::SwapChainError::Lost) => self.renderer.recreate(),
             Err(wgpu::SwapChainError::OutOfMemory) => panic!("swapchain: out of memory"),

@@ -1,8 +1,8 @@
-use std::ops::{Sub, AddAssign};
+use std::ops::{Sub, AddAssign, Add};
 
 pub type Scalar = f32;
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Position {
     pub x: Scalar,
     pub y: Scalar,
@@ -18,7 +18,25 @@ impl Position {
     }
 }
 
-impl Sub<Position> for Position {
+impl Add for Position {
+    type Output = Position;
+
+    fn add(self, rhs: Position) -> Self::Output {
+        Position {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+        }
+    }
+}
+
+impl AddAssign for Position {
+    fn add_assign(&mut self, rhs: Position) {
+        self.x += rhs.x;
+        self.y += rhs.y;
+    }
+}
+
+impl Sub for Position {
     type Output = Position;
 
     fn sub(self, rhs: Position) -> Self::Output {
@@ -29,7 +47,7 @@ impl Sub<Position> for Position {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Size {
     pub width: Scalar,
     pub height: Scalar,
@@ -52,7 +70,13 @@ impl AddAssign for Size {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+impl<P: winit::dpi::Pixel> From<winit::dpi::LogicalSize<P>> for Size {
+    fn from(size: winit::dpi::LogicalSize<P>) -> Self {
+        Size::new(size.width.cast(), size.height.cast())
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Rect {
     pub origin: Position,
     pub size: Size,

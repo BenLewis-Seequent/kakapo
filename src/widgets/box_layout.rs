@@ -43,11 +43,14 @@ impl Layout for BoxLayout {
     }
 
     fn size_hint(&self, children: &[WidgetTree]) -> Size {
-        let mut size = Size::zero();
+        let mut height = 0f32;
+        let mut width = 0f32;
         for child in children {
-            size += child.size_hint();
+            let size = child.size_hint();
+            height += size.height;
+            width = width.max(size.width);
         }
-        size
+        Size::new(width, height)
     }
 }
 

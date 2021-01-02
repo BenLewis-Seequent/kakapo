@@ -80,7 +80,7 @@ impl Renderer {
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
     }
 
-    pub fn render<F: for<'a> FnOnce(&'a mut Painter<'a>)>(&mut self, render_func: F)
+    pub fn render<F: for<'a> FnOnce(&'a mut Painter<'a>)>(&mut self, scale_factor: f64, render_func: F)
         -> Result<(), wgpu::SwapChainError> {
         let frame = self
             .swap_chain
@@ -91,7 +91,7 @@ impl Renderer {
             label: Some("Render Encoder"),
         });
 
-        render_func(&mut Painter::new(self, &mut encoder));
+        render_func(&mut Painter::new(self, &mut encoder, self.size.to_logical::<f32>(scale_factor).into()));
 
         self.belt.finish();
 

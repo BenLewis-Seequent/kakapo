@@ -1,16 +1,18 @@
 use std::any::Any;
 
-use crate::view::{Description, WidgetTree, Widget, WidgetCache};
+use crate::view::{Description, WidgetTree, Widget, WidgetCache, WidgetState};
 use crate::renderer::painter::Painter;
-use crate::geom::{Rect, Position, Size};
+use crate::geom::Size;
 
 pub struct Button {
-
+    colour: [f32; 4]
 }
 
 impl Button {
-    pub fn new() -> Button {
-        Button {}
+    pub fn new(colour: [f32; 4]) -> Button {
+        Button {
+            colour
+        }
     }
 }
 
@@ -20,18 +22,18 @@ impl Description for Button {
     }
 
     fn create(&self, _: &mut WidgetCache) -> WidgetTree {
-        WidgetTree::new_widget(ButtonWidget {})
+        WidgetTree::new_widget(ButtonWidget { colour: self.colour })
     }
 }
 
 
 struct ButtonWidget {
-
+    colour: [f32; 4]
 }
 
 impl Widget for ButtonWidget {
-    fn paint(&self, painter: &mut Painter) {
-        painter.paint_quad(Rect::new(Position::zero(), Size::new(1.0, 1.0)), [1.0, 1.0, 0.0, 1.0]);
+    fn paint(&self, state: &WidgetState, painter: &mut Painter) {
+        painter.paint_quad(state.local_rect(), self.colour);
     }
 
     fn size_hint(&self, children: &[WidgetTree]) -> Size {

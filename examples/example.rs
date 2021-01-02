@@ -17,10 +17,9 @@ pub struct ButtonView {
 
 impl View for ButtonView {
     fn view(&mut self, cache: &mut WidgetCache) -> WidgetTree {
-        let mut b = widgets::Box::new();
-        b.append(widgets::Button::new());
-        b.append(widgets::Button::new());
-        cache.build(&b)
+        cache.build( widgets::Box::new()
+            .append(widgets::Button::new([1.0, 0.0, 0.0, 1.0]))
+            .append(widgets::Button::new([0.0, 1.0, 0.0, 1.0])))
     }
 }
 

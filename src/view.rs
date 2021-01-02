@@ -2,7 +2,6 @@ use std::any::Any;
 
 use crate::renderer::painter::Painter;
 use crate::geom::{Size, Rect, Position};
-use futures::Stream;
 
 
 struct ViewData<V: View + ?Sized> {
@@ -13,6 +12,17 @@ struct ViewData<V: View + ?Sized> {
 pub struct WidgetState {
     allocation: Option<Rect>,
     children: Vec<WidgetTree>
+}
+
+impl WidgetState {
+    pub fn rect(&self) -> Rect {
+        self.allocation.unwrap()
+    }
+
+    pub fn local_rect(&self) -> Rect {
+        let rect = self.rect();
+        Rect::new(Position::zero(), rect.size)
+    }
 }
 
 struct WidgetData<W: Widget + ?Sized> {
@@ -98,7 +108,7 @@ impl WidgetTree {
                 }
             }
             WidgetTreeInner::Widget(ref w) => {
-                w.widget.paint(painter);
+                w.widget.paint(&w.state, &mut painter.with_rect(w.state.rect()));
             },
             WidgetTreeInner::Layout(ref mut layout) => {
                 for child in layout.children.iter_mut() {
@@ -149,7 +159,7 @@ impl WidgetTree {
 }
 
 pub trait Widget {
-    fn paint(&self, painter: &mut Painter);
+    fn paint(&self, state: &WidgetState, painter: &mut Painter);
 
     fn size_hint(&self, children: &[WidgetTree]) -> Size;
 }
