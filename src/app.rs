@@ -4,6 +4,7 @@ use crate::view::{View, WidgetTree};
 use crate::renderer::Renderer;
 use winit::platform::unix::EventLoopExtUnix;
 use crate::geom::{Rect, Position};
+use crate::events::EventState;
 
 
 pub struct AppBuilder {
@@ -76,6 +77,7 @@ impl App {
 struct Window {
     root: WidgetTree,
     window: winit::window::Window,
+    events: EventState,
     renderer: Renderer,
 }
 
@@ -97,10 +99,12 @@ impl Window {
         use futures::executor::block_on;
 
         let renderer = block_on(Renderer::new(&winit_window));
+        let events = EventState::new(&winit_window);
 
         Window {
             root,
             window: winit_window,
+            events,
             renderer
         }
     }
@@ -117,7 +121,9 @@ impl Window {
             winit::event::WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                 self.renderer.resize(*new_inner_size);
             }
-            _ => {}
+            event => {
+                self.events.process_event(event, &mut self.root);
+            }
         }
     }
 

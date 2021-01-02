@@ -3,6 +3,7 @@ use std::any::Any;
 use crate::view::{Description, WidgetTree, Widget, WidgetCache, WidgetState};
 use crate::renderer::painter::Painter;
 use crate::geom::Size;
+use crate::events::Event;
 
 pub struct Button {
     colour: [f32; 4]
@@ -32,6 +33,9 @@ struct ButtonWidget {
 }
 
 impl Widget for ButtonWidget {
+    fn event(&mut self, state: &mut WidgetState, event: Event) {
+    }
+
     fn paint(&self, state: &WidgetState, painter: &mut Painter) {
         painter.paint_quad(state.local_rect(), self.colour);
     }

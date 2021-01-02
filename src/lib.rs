@@ -4,3 +4,4 @@ pub mod app;
 pub mod geom;
 mod renderer;
 pub mod widgets;
+mod events;

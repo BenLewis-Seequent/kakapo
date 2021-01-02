@@ -2,6 +2,7 @@ use std::any::Any;
 
 use crate::renderer::painter::Painter;
 use crate::geom::{Size, Rect, Position};
+use crate::events::Event;
 
 
 struct ViewData<V: View + ?Sized> {
@@ -98,7 +99,48 @@ impl WidgetTree {
         }
     }
 
-    pub(super) fn paint(&mut self, painter: &mut Painter<'_>) {
+    fn find_widget_at(&mut self, pos: Position,
+                      func: &mut Option<impl FnOnce(&mut WidgetData<dyn Widget>, Position)>) {
+        match self.inner {
+            WidgetTreeInner::View(ref mut view) => {
+                if let Some(w) = &mut view.widget {
+                    w.find_widget_at(pos, func)
+                } else {
+                    panic!("View widget is None when processing event");
+                }
+            }
+            WidgetTreeInner::Widget(ref mut w) => {
+                // TODO child widgets
+                let rect = w.state.rect();
+                if rect.contains(pos) {
+                    func.take().unwrap()(w, pos - rect.origin);
+                }
+            },
+            WidgetTreeInner::Layout(ref mut layout) => {
+                for child in layout.children.iter_mut() {
+                    child.find_widget_at(pos, func);
+                    if func.is_none() {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    pub(crate) fn event(&mut self, event: Event) {
+        match event {
+            Event::MousePress(pos) => {
+                self.find_widget_at(pos, &mut Some(|w: &mut WidgetData<dyn Widget>, pos: Position|
+                    w.widget.event(&mut w.state, Event::MousePress(pos))))
+            },
+            Event::MouseRelease(pos) => {
+                self.find_widget_at(pos, &mut Some(|w: &mut WidgetData<dyn Widget>, pos: Position|
+                    w.widget.event(&mut w.state, Event::MouseRelease(pos))))
+            }
+        }
+    }
+
+    pub(crate) fn paint(&mut self, painter: &mut Painter<'_>) {
         match self.inner {
             WidgetTreeInner::View(ref mut view) => {
                 if let Some(w) = &mut view.widget {
@@ -159,6 +201,8 @@ impl WidgetTree {
 }
 
 pub trait Widget {
+    fn event(&mut self, state: &mut WidgetState, event: Event);
+
     fn paint(&self, state: &WidgetState, painter: &mut Painter);
 
     fn size_hint(&self, children: &[WidgetTree]) -> Size;
