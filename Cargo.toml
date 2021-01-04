@@ -1,8 +1,11 @@
 [package]
 name = "kakapo"
-version = "0.1.0"
+version = "0.0.1"
+description = "A desktop MVVM based GUI framework for Rust, focused on flexibility."
 authors = ["Ben Lewis <benlewisj@gmail.com>"]
 edition = "2018"
+license = "MIT"
+repository = "https://github.com/skinny121/kakapo/"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
