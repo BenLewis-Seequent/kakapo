@@ -3,9 +3,16 @@ use std::any::Any;
 use crate::renderer::painter::Painter;
 use crate::geom::{Size, Rect, Position};
 use crate::events::Event;
+use std::sync::{Mutex, Arc};
+use crate::app::AppInner;
+use crate::view_model::ViewModel;
+use std::collections::HashSet;
 
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+pub(crate) struct ViewId(pub(crate) u64);
 
 struct ViewData<V: View + ?Sized> {
+    view_id: ViewId,
     widget: Option<WidgetTree>,
     user_data: Option<Box<dyn Any>>,
     view: V
@@ -79,58 +86,76 @@ enum WidgetTreeInner {
     Layout(Box<LayoutData<dyn Layout>>),
 }
 
-pub struct WidgetTree {
-    inner: WidgetTreeInner
+pub struct WidgetTreeFactory {
+    pub(crate) app: Arc<AppInner>
 }
 
-impl WidgetTree {
-    fn new(inner: WidgetTreeInner) -> WidgetTree {
+impl WidgetTreeFactory {
+    fn new(&self, inner: WidgetTreeInner) -> WidgetTree {
         WidgetTree {
+            app: Arc::clone(&self.app),
             inner
         }
     }
 
-    pub fn new_view<V: View + 'static, D: 'static>(view: V, user_data: D) -> WidgetTree {
-        WidgetTree::new(WidgetTreeInner::View(Box::new(ViewData {
+    pub fn new_view<V: View + 'static, D: ViewModel + 'static>(&self, view: V, user_data: D) -> WidgetTree {
+        let view_id = self.app.new_view_id();
+        user_data.view_refs().init(Arc::clone(&self.app), view_id);
+
+        self.new(WidgetTreeInner::View(Box::new(ViewData {
+            view_id,
             widget: None,
             user_data: Some(Box::new(user_data) as Box<dyn Any>),
             view
         }) as Box<ViewData<dyn View>>))
     }
 
-    pub fn new_widget<W: Widget + 'static>(widget: W) -> WidgetTree {
-        WidgetTree::new(WidgetTreeInner::Widget(Box::new(WidgetData {
+    pub fn new_widget<W: Widget + 'static>(&self, widget: W) -> WidgetTree {
+        self.new(WidgetTreeInner::Widget(Box::new(WidgetData {
             allocation: None,
             children: Vec::new(),
             widget
         }) as Box<WidgetData<dyn Widget>>))
     }
 
-    pub fn new_layout<L: Layout + 'static>(layout: L, children: Vec<WidgetTree>) -> WidgetTree {
-        WidgetTree::new(WidgetTreeInner::Layout(Box::new(LayoutData {
+    pub fn new_layout<L: Layout + 'static>(&self,layout: L, children: Vec<WidgetTree>) -> WidgetTree {
+        self.new(WidgetTreeInner::Layout(Box::new(LayoutData {
             allocation: None,
             children,
             layout
         }) as Box<LayoutData<dyn Layout>>))
     }
+}
 
-    pub(crate) fn materialise_views(&mut self) {
+pub struct WidgetTree {
+    app: Arc<AppInner>,
+    inner: WidgetTreeInner
+}
+
+impl WidgetTree {
+    pub(crate) fn materialise_views(&mut self, user_data: UserData<'_>) {
         match self.inner {
             WidgetTreeInner::View(ref mut view) => {
                 if view.widget.is_none() {
-                    let mut tree = view.view.view(&mut WidgetCache {});
-                    tree.materialise_views();
+                    let user_data = view.user_data.as_deref().or(user_data);
+                    let mut cache = WidgetCache {
+                        factory: WidgetTreeFactory {
+                            app: Arc::clone(&self.app)
+                        }
+                    };
+                    let mut tree = view.view.view(&mut cache, user_data);
+                    tree.materialise_views(user_data);
                     view.widget = Some(tree);
                 }
             }
             WidgetTreeInner::Widget(ref mut w) => {
                 for child in w.children.iter_mut() {
-                    child.materialise_views();
+                    child.materialise_views(user_data);
                 }
             },
             WidgetTreeInner::Layout(ref mut layout) => {
                 for child in layout.children.iter_mut() {
-                    child.materialise_views();
+                    child.materialise_views(user_data);
                 }
             }
         }
@@ -183,10 +208,51 @@ impl WidgetTree {
         }
     }
 
-    pub(crate) fn paint(&mut self, user_data: UserData<'_>, painter: &mut Painter<'_>) {
+    pub(crate) fn update(&mut self, views: &HashSet<ViewId>, user_data: UserData<'_>) -> bool {
         match self.inner {
             WidgetTreeInner::View(ref mut view) => {
-                if let Some(w) = &mut view.widget {
+                let user_data = view.user_data.as_deref().or(user_data);
+                if views.contains(&view.view_id) { // TODO child widgets{
+                    // TODO cache widgets
+                    let mut cache = WidgetCache {
+                        factory: WidgetTreeFactory {
+                            app: Arc::clone(&self.app)
+                        }
+                    };
+                    let mut tree = view.view.view(&mut cache, user_data);
+                    tree.update(views, user_data);
+                    view.widget = Some(tree);
+                    true
+                } else {
+                    if let Some(w) = &mut view.widget {
+                        w.update(views, user_data)
+                    } else {
+                        panic!("View widget is None when updating views");
+                    }
+                }
+            }
+            WidgetTreeInner::Widget(ref w) => {
+                // TODO child widgets
+                false
+            },
+            WidgetTreeInner::Layout(ref mut layout) => {
+                // TODO determine whether the update needs to bubble up, i.e. the size hints are the
+                //  same then the parent doesn't need to re-layout.
+                let mut updated = false;
+                for child in layout.children.iter_mut() {
+                    if child.update(views, user_data) {
+                        updated = true
+                    }
+                }
+                updated
+            }
+        }
+    }
+
+    pub(crate) fn paint(&self, user_data: UserData<'_>, painter: &mut Painter<'_>) {
+        match self.inner {
+            WidgetTreeInner::View(ref view) => {
+                if let Some(w) = &view.widget {
                     w.paint(view.user_data.as_deref().or(user_data), painter)
                 } else {
                     panic!("View widget is None when painting");
@@ -199,8 +265,8 @@ impl WidgetTree {
                 };
                 w.widget.paint(state, &mut painter.with_rect(w.allocation.unwrap()));
             },
-            WidgetTreeInner::Layout(ref mut layout) => {
-                for child in layout.children.iter_mut() {
+            WidgetTreeInner::Layout(ref layout) => {
+                for child in layout.children.iter() {
                     child.paint(user_data, painter);
                 }
             }
@@ -287,15 +353,42 @@ pub trait Description {
 }
 
 pub struct WidgetCache {
-
+    factory: WidgetTreeFactory,
 }
 
 impl WidgetCache {
     pub fn build<D: Description + ?Sized>(&mut self, desc: &D) -> WidgetTree {
         desc.create(self)
     }
+
+    pub fn factory(&self) -> &WidgetTreeFactory {
+        &self.factory
+    }
 }
 
 pub trait View {
-    fn view(&mut self, cache: &mut WidgetCache) -> WidgetTree;
+    fn view(&mut self, cache: &mut WidgetCache, user_data: UserData<'_>) -> WidgetTree;
+}
+
+pub struct ViewRefs {
+    inner: Mutex<Vec<(Arc<AppInner>, ViewId)>>,
+}
+
+impl ViewRefs {
+    pub fn new() -> ViewRefs {
+        ViewRefs {
+            inner: Mutex::new(Vec::new())
+        }
+    }
+
+    fn init(&self, app: Arc<AppInner>, view_id: ViewId) {
+        self.inner.lock().unwrap().push((app, view_id))
+    }
+
+    pub fn update(&self) {
+        let guard = self.inner.lock().unwrap();
+        for (app, view_id) in guard.iter() {
+            app.update_view(*view_id);
+        }
+    }
 }

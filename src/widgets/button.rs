@@ -29,8 +29,8 @@ impl<D: ButtonDelegate + 'static> Description for Button<D> {
 
     }
 
-    fn create(&self, _: &mut WidgetCache) -> WidgetTree {
-        WidgetTree::new_widget(ButtonWidget {
+    fn create(&self, cache: &mut WidgetCache) -> WidgetTree {
+        cache.factory().new_widget(ButtonWidget {
             colour: self.colour,
             delegate: self.delegate
         })

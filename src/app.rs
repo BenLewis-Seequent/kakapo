@@ -1,27 +1,37 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use crate::view::{View, WidgetTree};
+use crate::view::{View, WidgetTree, WidgetTreeFactory, ViewId};
 use crate::renderer::Renderer;
 use winit::platform::unix::EventLoopExtUnix;
 use crate::geom::{Rect, Position};
 use crate::events::EventState;
+use std::sync::{Arc, Mutex};
+use crate::view_model::ViewModel;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::ops::DerefMut;
 
 
 pub struct AppBuilder {
     windows: HashMap<winit::window::WindowId, Window>,
     event_loop: winit::event_loop::EventLoop<()>,
+    app_inner: Arc<AppInner>,
 }
 
 impl AppBuilder {
     pub fn new() -> AppBuilder {
+        let app_inner = Arc::new(AppInner::new());
         AppBuilder {
             windows: HashMap::new(),
             event_loop: winit::event_loop::EventLoop::<()>::new_x11_any_thread().unwrap(),
+            app_inner
         }
     }
 
-    pub fn add_window<V: View + 'static, D: 'static>(&mut self, root: V, user_data: D) {
-        let window = Window::create(WidgetTree::new_view(root, user_data),
+    pub fn add_window<V: View + 'static, D: ViewModel + 'static>(&mut self, root: V, user_data: D) {
+        let factory = WidgetTreeFactory {
+            app: Arc::clone(&self.app_inner)
+        };
+        let window = Window::create(factory.new_view(root, user_data),
                                     &self.event_loop);
         self.windows.insert(window.window_id(), window);
     }
@@ -30,9 +40,10 @@ impl AppBuilder {
         let AppBuilder {
             windows,
             event_loop,
+            app_inner,
         } = self;
 
-        let mut app = App { windows };
+        let mut app = App { windows, inner: app_inner };
 
         event_loop.run(move |event, _window_target, control_flow| {
             if winit::event::Event::MainEventsCleared == event {
@@ -46,8 +57,31 @@ impl AppBuilder {
     }
 }
 
+pub(crate) struct AppInner {
+    view_id_counter: AtomicU64,
+    views_to_update: Mutex<HashSet<ViewId>>
+}
+
+impl AppInner {
+    fn new() -> AppInner {
+        AppInner {
+            view_id_counter: AtomicU64::new(0),
+            views_to_update: Mutex::new(HashSet::new()),
+        }
+    }
+
+    pub(crate) fn new_view_id(&self) -> ViewId {
+        ViewId(self.view_id_counter.fetch_add(1, Ordering::Relaxed))
+    }
+
+    pub(crate) fn update_view(&self, view_id: ViewId) {
+        self.views_to_update.lock().unwrap().insert(view_id);
+    }
+}
+
 pub struct App {
     windows: HashMap<winit::window::WindowId, Window>,
+    inner: Arc<AppInner>,
 }
 
 impl App {
@@ -64,6 +98,17 @@ impl App {
 
                 let window = self.windows.get_mut(&window_id).expect("Got window");
                 window.handle_event(window_event);
+            }
+            winit::event::Event::MainEventsCleared => {
+                let views_to_update = std::mem::take(self.inner.views_to_update.lock().unwrap().deref_mut());
+                for window in self.windows.values_mut() {
+                    if window.root.update(&views_to_update, None) {
+                        let size = window.window.inner_size().to_logical::<f32>(window.window.scale_factor());
+                        window.root.set_rect(Rect::new(Position::zero(), size.into()));
+                    }
+                    // TODO don't unconditionally redraw
+                    window.window.request_redraw();
+                }
             }
             winit::event::Event::RedrawRequested(window_id) => {
                 let window = self.windows.get_mut(&window_id).expect("Got window");
@@ -86,7 +131,7 @@ impl Window {
         mut root: WidgetTree,
         window_target: &winit::event_loop::EventLoopWindowTarget<()>
     ) -> Window {
-        root.materialise_views();
+        root.materialise_views(None);
         let size = root.size_hint();
         root.set_rect(Rect::new(Position::zero(), size));
         let logical_size = winit::dpi::LogicalSize::new(size.width, size.height);

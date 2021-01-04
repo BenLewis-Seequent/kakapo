@@ -26,7 +26,7 @@ impl Description for Box {
 
     fn create(&self, cache: &mut WidgetCache) -> WidgetTree {
         let children = self.widgets.iter().map(|desc| cache.build(desc.as_ref())).collect::<Vec<_>>();
-        WidgetTree::new_layout(BoxLayout {}, children)
+        cache.factory().new_layout(BoxLayout {}, children)
     }
 }
 
