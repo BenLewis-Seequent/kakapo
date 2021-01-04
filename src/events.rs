@@ -1,4 +1,5 @@
 use winit::dpi::PhysicalPosition;
+
 use crate::geom::Position;
 use crate::view::WidgetTree;
 
@@ -56,4 +57,3 @@ impl EventState {
         }
     }
 }
-

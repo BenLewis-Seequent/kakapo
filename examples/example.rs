@@ -1,13 +1,12 @@
-use kakapo::app;
-use kakapo::view_model;
-use kakapo::view;
-use kakapo::view::{View, WidgetTree, WidgetCache, UserDataMut, ViewRefs, UserData};
-use kakapo::widgets;
-use std::sync::Arc;
-use kakapo::widgets::ButtonDelegate;
-use kakapo::view_model::ViewModel;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
+
+use kakapo::app;
+use kakapo::view::{UserData, UserDataMut, View, ViewRefs, WidgetCache, WidgetTree};
+use kakapo::view_model::ViewModel;
+use kakapo::widgets;
+use kakapo::widgets::ButtonDelegate;
 
 struct SharedState {
     view_refs: ViewRefs,
@@ -17,7 +16,7 @@ struct SharedState {
 
 struct AppData {
     two_buttons: bool,
-    shared_state: Arc<SharedState>
+    shared_state: Arc<SharedState>,
 }
 
 impl AppData {
@@ -28,7 +27,7 @@ impl AppData {
                 view_refs: ViewRefs::new(),
                 first: AtomicBool::new(false),
                 second: AtomicBool::new(false),
-            })
+            }),
         }
     }
 }
@@ -62,11 +61,7 @@ impl ButtonDelegate for SecondaryButtonDelegate {
         let state = Arc::clone(&app_data.shared_state);
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_secs(2));
-            let field = if first {
-                &state.first
-            } else {
-                &state.second
-            };
+            let field = if first { &state.first } else { &state.second };
             field.fetch_xor(true, Ordering::SeqCst);
             state.view_refs.update();
         });
@@ -81,22 +76,34 @@ fn secondary_button_colour(data: &AtomicBool) -> [f32; 4] {
     }
 }
 
-struct AppView { }
+struct AppView {}
 
 impl View for AppView {
     fn view(&mut self, cache: &mut WidgetCache, user_data: UserData<'_>) -> WidgetTree {
         println!("View!");
         let data = user_data.unwrap().downcast_ref::<AppData>().unwrap();
         let mut b = widgets::Box::new()
-            .append(widgets::Button::new(if data.two_buttons {[0.0, 1.0, 0.0, 1.0]} else {[1.0, 0.0, 0.0, 1.0]}, PrimaryButtonDelegate))
-            .append(widgets::Button::new(secondary_button_colour(&data.shared_state.first), SecondaryButtonDelegate(true)));
+            .append(widgets::Button::new(
+                if data.two_buttons {
+                    [0.0, 1.0, 0.0, 1.0]
+                } else {
+                    [1.0, 0.0, 0.0, 1.0]
+                },
+                PrimaryButtonDelegate,
+            ))
+            .append(widgets::Button::new(
+                secondary_button_colour(&data.shared_state.first),
+                SecondaryButtonDelegate(true),
+            ));
         if data.two_buttons {
-            b = b.append(widgets::Button::new(secondary_button_colour(&data.shared_state.second), SecondaryButtonDelegate(false)));
+            b = b.append(widgets::Button::new(
+                secondary_button_colour(&data.shared_state.second),
+                SecondaryButtonDelegate(false),
+            ));
         }
         cache.build(b)
     }
 }
-
 
 fn main() {
     let mut app = app::AppBuilder::new();

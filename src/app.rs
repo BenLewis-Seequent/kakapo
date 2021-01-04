@@ -1,15 +1,15 @@
 use std::collections::{HashMap, HashSet};
-
-use crate::view::{View, WidgetTree, WidgetTreeFactory, ViewId};
-use crate::renderer::Renderer;
-use winit::platform::unix::EventLoopExtUnix;
-use crate::geom::{Rect, Position};
-use crate::events::EventState;
-use std::sync::{Arc, Mutex};
-use crate::view_model::ViewModel;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::ops::DerefMut;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
+use winit::platform::unix::EventLoopExtUnix;
+
+use crate::events::EventState;
+use crate::geom::{Position, Rect};
+use crate::renderer::Renderer;
+use crate::view::{View, ViewId, WidgetTree, WidgetTreeFactory};
+use crate::view_model::ViewModel;
 
 pub struct AppBuilder {
     windows: HashMap<winit::window::WindowId, Window>,
@@ -23,16 +23,15 @@ impl AppBuilder {
         AppBuilder {
             windows: HashMap::new(),
             event_loop: winit::event_loop::EventLoop::<()>::new_x11_any_thread().unwrap(),
-            app_inner
+            app_inner,
         }
     }
 
     pub fn add_window<V: View + 'static, D: ViewModel + 'static>(&mut self, root: V, user_data: D) {
         let factory = WidgetTreeFactory {
-            app: Arc::clone(&self.app_inner)
+            app: Arc::clone(&self.app_inner),
         };
-        let window = Window::create(factory.new_view(root, user_data),
-                                    &self.event_loop);
+        let window = Window::create(factory.new_view(root, user_data), &self.event_loop);
         self.windows.insert(window.window_id(), window);
     }
 
@@ -43,7 +42,10 @@ impl AppBuilder {
             app_inner,
         } = self;
 
-        let mut app = App { windows, inner: app_inner };
+        let mut app = App {
+            windows,
+            inner: app_inner,
+        };
 
         event_loop.run(move |event, _window_target, control_flow| {
             if winit::event::Event::MainEventsCleared == event {
@@ -59,7 +61,7 @@ impl AppBuilder {
 
 pub(crate) struct AppInner {
     view_id_counter: AtomicU64,
-    views_to_update: Mutex<HashSet<ViewId>>
+    views_to_update: Mutex<HashSet<ViewId>>,
 }
 
 impl AppInner {
@@ -91,7 +93,9 @@ impl App {
                 event: window_event,
                 window_id,
             } => {
-                if window_event == winit::event::WindowEvent::Destroyed || window_event == winit::event::WindowEvent::CloseRequested {
+                if window_event == winit::event::WindowEvent::Destroyed
+                    || window_event == winit::event::WindowEvent::CloseRequested
+                {
                     self.windows.remove(&window_id);
                     return;
                 }
@@ -100,11 +104,17 @@ impl App {
                 window.handle_event(window_event);
             }
             winit::event::Event::MainEventsCleared => {
-                let views_to_update = std::mem::take(self.inner.views_to_update.lock().unwrap().deref_mut());
+                let views_to_update =
+                    std::mem::take(self.inner.views_to_update.lock().unwrap().deref_mut());
                 for window in self.windows.values_mut() {
                     if window.root.update(&views_to_update, None) {
-                        let size = window.window.inner_size().to_logical::<f32>(window.window.scale_factor());
-                        window.root.set_rect(Rect::new(Position::zero(), size.into()));
+                        let size = window
+                            .window
+                            .inner_size()
+                            .to_logical::<f32>(window.window.scale_factor());
+                        window
+                            .root
+                            .set_rect(Rect::new(Position::zero(), size.into()));
                     }
                     // TODO don't unconditionally redraw
                     window.window.request_redraw();
@@ -129,7 +139,7 @@ struct Window {
 impl Window {
     fn create(
         mut root: WidgetTree,
-        window_target: &winit::event_loop::EventLoopWindowTarget<()>
+        window_target: &winit::event_loop::EventLoopWindowTarget<()>,
     ) -> Window {
         root.materialise_views(None);
         let size = root.size_hint();
@@ -150,7 +160,7 @@ impl Window {
             root,
             window: winit_window,
             events,
-            renderer
+            renderer,
         }
     }
 
@@ -174,7 +184,9 @@ impl Window {
 
     pub(crate) fn paint(&mut self) {
         let root = &mut self.root;
-        match self.renderer.render(self.window.scale_factor(), |painter| root.paint(None, painter)) {
+        match self.renderer.render(self.window.scale_factor(), |painter| {
+            root.paint(None, painter)
+        }) {
             Ok(_) => {}
             Err(wgpu::SwapChainError::Lost) => self.renderer.recreate(),
             Err(wgpu::SwapChainError::OutOfMemory) => panic!("swapchain: out of memory"),
@@ -182,5 +194,3 @@ impl Window {
         }
     }
 }
-
-

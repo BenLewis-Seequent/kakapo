@@ -1,9 +1,11 @@
 use std::any::Any;
 
-use crate::view::{WidgetTree, Widget, WidgetCache, WidgetState, WidgetStateMut, UserDataMut, WidgetKey};
-use crate::renderer::painter::Painter;
-use crate::geom::Size;
 use crate::events::Event;
+use crate::geom::Size;
+use crate::renderer::painter::Painter;
+use crate::view::{
+    UserDataMut, Widget, WidgetCache, WidgetKey, WidgetState, WidgetStateMut, WidgetTree,
+};
 use crate::Description;
 
 pub trait ButtonDelegate {
@@ -39,30 +41,30 @@ impl<D: ButtonDelegate + 'static> Description for Button<D> {
                 widget.delegate = self.delegate;
                 Ok(())
             }
-            None => Err(self)
+            None => Err(self),
         }
     }
 
     fn create(self, cache: &mut WidgetCache) -> WidgetTree {
-        cache.factory().new_widget(self.key, ButtonWidget {
-            colour: self.colour,
-            delegate: self.delegate
-        })
+        cache.factory().new_widget(
+            self.key,
+            ButtonWidget {
+                colour: self.colour,
+                delegate: self.delegate,
+            },
+        )
     }
 }
 
-
 struct ButtonWidget<D: ButtonDelegate> {
     colour: [f32; 4],
-    delegate: D
+    delegate: D,
 }
 
 impl<D: ButtonDelegate + 'static> Widget for ButtonWidget<D> {
     fn event(&mut self, mut state: WidgetStateMut<'_>, event: Event) {
         match event {
-            Event::MousePress(_) => {
-                self.delegate.pressed(state.user_data())
-            }
+            Event::MousePress(_) => self.delegate.pressed(state.user_data()),
             _ => {}
         }
     }
@@ -71,7 +73,7 @@ impl<D: ButtonDelegate + 'static> Widget for ButtonWidget<D> {
         painter.paint_quad(state.local_rect(), self.colour);
     }
 
-    fn size_hint(&self, children: &[WidgetTree]) -> Size {
+    fn size_hint(&self, _: &[WidgetTree]) -> Size {
         Size::new(100.0, 100.0)
     }
 }

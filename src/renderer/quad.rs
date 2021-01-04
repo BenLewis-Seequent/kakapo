@@ -1,5 +1,5 @@
-use wgpu::RenderPass;
 use wgpu::util::{DeviceExt, StagingBelt};
+use wgpu::RenderPass;
 
 use crate::geom::Rect;
 
@@ -11,20 +11,12 @@ struct Quad {
     colour: [f32; 4],
 }
 
-const QUAD_SIZE: wgpu::BufferSize = unsafe {
-    wgpu::BufferSize::new_unchecked(std::mem::size_of::<Quad>() as u64)
-};
+const QUAD_SIZE: wgpu::BufferSize =
+    unsafe { wgpu::BufferSize::new_unchecked(std::mem::size_of::<Quad>() as u64) };
 
-const INDICES: &[u16] = &[
-    0, 1, 2, 3
-];
+const INDICES: &[u16] = &[0, 1, 2, 3];
 
-const VERTICES: &[[f32; 2]] = &[
-    [0.0, 0.0],
-    [0.0, 1.0],
-    [1.0, 0.0],
-    [1.0, 1.0]
-];
+const VERTICES: &[[f32; 2]] = &[[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]];
 
 pub(super) struct QuadPipeline {
     pipeline: wgpu::RenderPipeline,
@@ -57,40 +49,38 @@ impl QuadPipeline {
                 module: &fs_module,
                 entry_point: "main",
             }),
-            rasterization_state: Some(
-                wgpu::RasterizationStateDescriptor {
-                    front_face: wgpu::FrontFace::Cw,
-                    cull_mode: wgpu::CullMode::Back,
-                    depth_bias: 0,
-                    depth_bias_slope_scale: 0.0,
-                    depth_bias_clamp: 0.0,
-                    clamp_depth: false,
-                }
-            ),
-            color_states: &[
-                wgpu::ColorStateDescriptor {
-                    format,
-                    color_blend: wgpu::BlendDescriptor::REPLACE,
-                    alpha_blend: wgpu::BlendDescriptor::REPLACE,
-                    write_mask: wgpu::ColorWrite::ALL,
-                },
-            ],
+            rasterization_state: Some(wgpu::RasterizationStateDescriptor {
+                front_face: wgpu::FrontFace::Cw,
+                cull_mode: wgpu::CullMode::Back,
+                depth_bias: 0,
+                depth_bias_slope_scale: 0.0,
+                depth_bias_clamp: 0.0,
+                clamp_depth: false,
+            }),
+            color_states: &[wgpu::ColorStateDescriptor {
+                format,
+                color_blend: wgpu::BlendDescriptor::REPLACE,
+                alpha_blend: wgpu::BlendDescriptor::REPLACE,
+                write_mask: wgpu::ColorWrite::ALL,
+            }],
             primitive_topology: wgpu::PrimitiveTopology::TriangleStrip,
             depth_stencil_state: None,
             vertex_state: wgpu::VertexStateDescriptor {
                 index_format: wgpu::IndexFormat::Uint16,
-                vertex_buffers: &[wgpu::VertexBufferDescriptor {
-                    stride: std::mem::size_of::<[f32; 2]>() as u64,
-                    step_mode: wgpu::InputStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![0 => Float2],
-                },
-                wgpu::VertexBufferDescriptor {
-                    stride: QUAD_SIZE.get(),
-                    step_mode: wgpu::InputStepMode::Instance,
-                    attributes: &wgpu::vertex_attr_array![1 => Float2,
+                vertex_buffers: &[
+                    wgpu::VertexBufferDescriptor {
+                        stride: std::mem::size_of::<[f32; 2]>() as u64,
+                        step_mode: wgpu::InputStepMode::Vertex,
+                        attributes: &wgpu::vertex_attr_array![0 => Float2],
+                    },
+                    wgpu::VertexBufferDescriptor {
+                        stride: QUAD_SIZE.get(),
+                        step_mode: wgpu::InputStepMode::Instance,
+                        attributes: &wgpu::vertex_attr_array![1 => Float2,
                                                           2 => Float2,
                                                           3 => Float4],
-                }],
+                    },
+                ],
             },
             sample_count: 1,
             sample_mask: !0,
@@ -129,24 +119,30 @@ impl QuadPipeline {
         self.number_of_quads = 0
     }
 
-    pub fn add_quad(&mut self,
-                    belt: &mut StagingBelt,
-                    encoder: &mut wgpu::CommandEncoder,
-                    device: &wgpu::Device,
-                    rect: Rect, colour: [f32; 4]) {
-        let mut buffer = belt.write_buffer(encoder, &self.instance_buffer,
-                          self.number_of_quads as u64 * QUAD_SIZE.get(),
-                          QUAD_SIZE,
-                          device);
+    pub fn add_quad(
+        &mut self,
+        belt: &mut StagingBelt,
+        encoder: &mut wgpu::CommandEncoder,
+        device: &wgpu::Device,
+        rect: Rect,
+        colour: [f32; 4],
+    ) {
+        let mut buffer = belt.write_buffer(
+            encoder,
+            &self.instance_buffer,
+            self.number_of_quads as u64 * QUAD_SIZE.get(),
+            QUAD_SIZE,
+            device,
+        );
         buffer.copy_from_slice(bytemuck::bytes_of(&Quad {
             position: [rect.origin.x, rect.origin.y],
             size: [rect.size.width, rect.size.height],
-            colour
+            colour,
         }));
         self.number_of_quads += 1;
     }
 
-    pub fn record<'a>(&'a self, encoder: &mut RenderPass<'a>)  {
+    pub fn record<'a>(&'a self, encoder: &mut RenderPass<'a>) {
         encoder.set_pipeline(&self.pipeline);
         encoder.set_index_buffer(self.index_buffer.slice(..));
         encoder.set_vertex_buffer(0, self.vertex_buffer.slice(..));
@@ -154,4 +150,3 @@ impl QuadPipeline {
         encoder.draw_indexed(0..4, 0, 0..self.number_of_quads)
     }
 }
-

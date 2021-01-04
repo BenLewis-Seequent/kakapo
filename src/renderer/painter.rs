@@ -1,5 +1,5 @@
+use crate::geom::{Position, Rect, Size};
 use crate::renderer::Renderer;
-use crate::geom::{Rect, Position, Size};
 
 pub struct Painter<'a> {
     renderer: &'a mut Renderer,
@@ -9,13 +9,17 @@ pub struct Painter<'a> {
 }
 
 impl<'a> Painter<'a> {
-    pub(super) fn new(renderer: &'a mut Renderer, encoder: &'a mut wgpu::CommandEncoder, viewport_size: Size) -> Self {
+    pub(super) fn new(
+        renderer: &'a mut Renderer,
+        encoder: &'a mut wgpu::CommandEncoder,
+        viewport_size: Size,
+    ) -> Self {
         renderer.quad.reset();
         Painter {
             renderer,
             encoder,
             viewport_size,
-            origin: Position::zero()
+            origin: Position::zero(),
         }
     }
 
@@ -28,17 +32,22 @@ impl<'a> Painter<'a> {
                 2.0 * rect.origin.x / self.viewport_size.width - 1.0,
                 1.0 - 2.0 * (rect.origin.y + rect.size.height) / self.viewport_size.height,
             ),
-            Size::new(2.0 * rect.size.width / self.viewport_size.width,
-                          2.0 * rect.size.height / self.viewport_size.height)
+            Size::new(
+                2.0 * rect.size.width / self.viewport_size.width,
+                2.0 * rect.size.height / self.viewport_size.height,
+            ),
         )
     }
 
     pub fn paint_quad(&mut self, rect: Rect, colour: [f32; 4]) {
         let transformed_rect = self.transform_rect(rect);
-        self.renderer.quad.add_quad(&mut self.renderer.belt,
-                                    &mut self.encoder,
-                                    &self.renderer.device,
-                                    transformed_rect, colour);
+        self.renderer.quad.add_quad(
+            &mut self.renderer.belt,
+            &mut self.encoder,
+            &self.renderer.device,
+            transformed_rect,
+            colour,
+        );
     }
 
     pub fn with_rect(&mut self, rect: Rect) -> Painter<'_> {

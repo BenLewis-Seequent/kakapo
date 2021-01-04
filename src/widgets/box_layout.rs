@@ -1,11 +1,12 @@
-use crate::view::{WidgetTree, Layout, WidgetCache, WidgetKey};
 use std::any::Any;
-use crate::geom::{Size, Rect, Position};
-use crate::Description;
+
 use crate::description::BoxedDescription;
+use crate::geom::{Position, Rect, Size};
+use crate::view::{Layout, WidgetCache, WidgetKey, WidgetTree};
+use crate::Description;
 
 pub struct Box {
-    widgets: Vec<BoxedDescription>
+    widgets: Vec<BoxedDescription>,
 }
 
 impl Box {
@@ -26,12 +27,19 @@ impl Description for Box {
         None
     }
 
-    fn apply(self, obj: &mut dyn Any) -> Result<(), Self> where Self: Sized {
+    fn apply(self, _: &mut dyn Any) -> Result<(), Self>
+    where
+        Self: Sized,
+    {
         panic!("Box can't be persisted")
     }
 
     fn create(self, cache: &mut WidgetCache) -> WidgetTree {
-        let children = self.widgets.into_iter().map(|desc| cache.build(desc)).collect::<Vec<_>>();
+        let children = self
+            .widgets
+            .into_iter()
+            .map(|desc| cache.build(desc))
+            .collect::<Vec<_>>();
         cache.factory().new_layout(BoxLayout {}, children)
     }
 }
@@ -39,7 +47,7 @@ impl Description for Box {
 struct BoxLayout {}
 
 impl Layout for BoxLayout {
-    fn layout(&self, children: &mut [WidgetTree], size: Size) {
+    fn layout(&self, children: &mut [WidgetTree], _: Size) {
         let mut y = 0f32;
         for child in children {
             let size = child.size_hint();
@@ -59,7 +67,3 @@ impl Layout for BoxLayout {
         Size::new(width, height)
     }
 }
-
-
-
-

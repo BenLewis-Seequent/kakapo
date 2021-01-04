@@ -1,4 +1,4 @@
-use std::ops::{Sub, AddAssign, Add};
+use std::ops::{Add, AddAssign, Sub};
 
 pub type Scalar = f32;
 

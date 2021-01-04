@@ -1,13 +1,13 @@
 use std::any::Any;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 
-use crate::renderer::painter::Painter;
-use crate::geom::{Size, Rect, Position};
-use crate::events::Event;
-use std::sync::{Mutex, Arc};
 use crate::app::AppInner;
-use crate::view_model::ViewModel;
-use std::collections::{HashSet, HashMap};
 use crate::description::Description;
+use crate::events::Event;
+use crate::geom::{Position, Rect, Size};
+use crate::renderer::painter::Painter;
+use crate::view_model::ViewModel;
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct ViewId(pub(crate) u64);
@@ -16,7 +16,7 @@ struct ViewData<V: View + ?Sized> {
     view_id: ViewId,
     widget: Option<WidgetTree>,
     user_data: Option<Box<dyn Any>>,
-    view: V
+    view: V,
 }
 
 pub type UserData<'a> = Option<&'a dyn Any>;
@@ -24,20 +24,19 @@ pub type UserDataMut<'a> = Option<&'a mut dyn Any>;
 
 #[derive(Eq, PartialEq, Hash, Copy, Clone)]
 enum WidgetKeyInner {
-    Location(&'static std::panic::Location<'static>)
+    Location(&'static std::panic::Location<'static>),
 }
-
 
 #[derive(Eq, PartialEq, Hash, Copy, Clone)]
 pub struct WidgetKey {
-    inner: WidgetKeyInner
+    inner: WidgetKeyInner,
 }
 
 impl WidgetKey {
     #[track_caller]
     pub fn caller() -> WidgetKey {
         WidgetKey {
-            inner: WidgetKeyInner::Location(std::panic::Location::caller())
+            inner: WidgetKeyInner::Location(std::panic::Location::caller()),
         }
     }
 }
@@ -60,7 +59,7 @@ impl<'a> WidgetState<'a> {
     pub fn user_data(&self) -> UserData<'_> {
         match self.user_data {
             Some(ref data) => Some(*data),
-            None => None
+            None => None,
         }
     }
 }
@@ -83,11 +82,10 @@ impl<'a> WidgetStateMut<'a> {
     pub fn user_data(&mut self) -> UserDataMut<'_> {
         match self.user_data {
             Some(ref mut data) => Some(*data),
-            None => None
+            None => None,
         }
     }
 }
-
 
 struct WidgetData<W: Widget + ?Sized> {
     key: WidgetKey,
@@ -99,7 +97,7 @@ struct WidgetData<W: Widget + ?Sized> {
 struct LayoutData<L: Layout + ?Sized> {
     allocation: Option<Rect>,
     children: Vec<WidgetTree>,
-    layout: L
+    layout: L,
 }
 
 enum WidgetTreeInner {
@@ -109,18 +107,22 @@ enum WidgetTreeInner {
 }
 
 pub struct WidgetTreeFactory {
-    pub(crate) app: Arc<AppInner>
+    pub(crate) app: Arc<AppInner>,
 }
 
 impl WidgetTreeFactory {
     fn new(&self, inner: WidgetTreeInner) -> WidgetTree {
         WidgetTree {
             app: Arc::clone(&self.app),
-            inner
+            inner,
         }
     }
 
-    pub fn new_view<V: View + 'static, D: ViewModel + 'static>(&self, view: V, user_data: D) -> WidgetTree {
+    pub fn new_view<V: View + 'static, D: ViewModel + 'static>(
+        &self,
+        view: V,
+        user_data: D,
+    ) -> WidgetTree {
         let view_id = self.app.new_view_id();
         user_data.view_refs().init(Arc::clone(&self.app), view_id);
 
@@ -128,7 +130,7 @@ impl WidgetTreeFactory {
             view_id,
             widget: None,
             user_data: Some(Box::new(user_data) as Box<dyn Any>),
-            view
+            view,
         }) as Box<ViewData<dyn View>>))
     }
 
@@ -137,22 +139,28 @@ impl WidgetTreeFactory {
             key,
             allocation: None,
             children: Vec::new(),
-            widget
-        }) as Box<WidgetData<dyn Widget>>))
+            widget,
+        })
+            as Box<WidgetData<dyn Widget>>))
     }
 
-    pub fn new_layout<L: Layout + 'static>(&self,layout: L, children: Vec<WidgetTree>) -> WidgetTree {
+    pub fn new_layout<L: Layout + 'static>(
+        &self,
+        layout: L,
+        children: Vec<WidgetTree>,
+    ) -> WidgetTree {
         self.new(WidgetTreeInner::Layout(Box::new(LayoutData {
             allocation: None,
             children,
-            layout
-        }) as Box<LayoutData<dyn Layout>>))
+            layout,
+        })
+            as Box<LayoutData<dyn Layout>>))
     }
 }
 
 pub struct WidgetTree {
     app: Arc<AppInner>,
-    inner: WidgetTreeInner
+    inner: WidgetTreeInner,
 }
 
 impl WidgetTree {
@@ -176,7 +184,7 @@ impl WidgetTree {
                 for child in w.children.iter_mut() {
                     child.materialise_views(user_data);
                 }
-            },
+            }
             WidgetTreeInner::Layout(ref mut layout) => {
                 for child in layout.children.iter_mut() {
                     child.materialise_views(user_data);
@@ -193,7 +201,7 @@ impl WidgetTree {
                     child.deconstruct(widgets);
                 }
                 widgets.insert(w.key, self);
-            },
+            }
             WidgetTreeInner::Layout(ref mut layout) => {
                 for child in layout.children.drain(..) {
                     child.deconstruct(widgets);
@@ -202,10 +210,12 @@ impl WidgetTree {
         }
     }
 
-    fn find_widget_at(&mut self,
-                      pos: Position,
-                      user_data: UserDataMut<'_>,
-                      func: impl FnOnce(&mut WidgetData<dyn Widget>, UserDataMut<'_>, Position)) {
+    fn find_widget_at(
+        &mut self,
+        pos: Position,
+        user_data: UserDataMut<'_>,
+        func: impl FnOnce(&mut WidgetData<dyn Widget>, UserDataMut<'_>, Position),
+    ) {
         match self.inner {
             WidgetTreeInner::View(ref mut view) => {
                 if let Some(w) = &mut view.widget {
@@ -220,7 +230,7 @@ impl WidgetTree {
                 if rect.contains(pos) {
                     func(w, user_data, pos - rect.origin);
                 }
-            },
+            }
             WidgetTreeInner::Layout(ref mut layout) => {
                 for child in layout.children.iter_mut() {
                     if child.rect().contains(pos) {
@@ -236,7 +246,7 @@ impl WidgetTree {
         self.find_widget_at(pos, None, |w, user_data, pos| {
             let state = WidgetStateMut {
                 rect: w.allocation.unwrap(),
-                user_data
+                user_data,
             };
             w.widget.event(state, event_constructor(pos));
         });
@@ -253,12 +263,13 @@ impl WidgetTree {
         match self.inner {
             WidgetTreeInner::View(ref mut view) => {
                 let user_data = view.user_data.as_deref().or(user_data);
-                if views.contains(&view.view_id) { // TODO child widgets{
+                if views.contains(&view.view_id) {
+                    // TODO child widgets{
                     let mut cached = HashMap::new();
                     view.widget.take().map(|tree| tree.deconstruct(&mut cached));
                     let mut cache = WidgetCache {
                         factory: WidgetTreeFactory {
-                            app: Arc::clone(&self.app)
+                            app: Arc::clone(&self.app),
                         },
                         cached,
                     };
@@ -274,10 +285,10 @@ impl WidgetTree {
                     }
                 }
             }
-            WidgetTreeInner::Widget(ref w) => {
+            WidgetTreeInner::Widget(_) => {
                 // TODO child widgets
                 false
-            },
+            }
             WidgetTreeInner::Layout(ref mut layout) => {
                 // TODO determine whether the update needs to bubble up, i.e. the size hints are the
                 //  same then the parent doesn't need to re-layout.
@@ -304,10 +315,11 @@ impl WidgetTree {
             WidgetTreeInner::Widget(ref w) => {
                 let state = WidgetState {
                     rect: w.allocation.unwrap(),
-                    user_data
+                    user_data,
                 };
-                w.widget.paint(state, &mut painter.with_rect(w.allocation.unwrap()));
-            },
+                w.widget
+                    .paint(state, &mut painter.with_rect(w.allocation.unwrap()));
+            }
             WidgetTreeInner::Layout(ref layout) => {
                 for child in layout.children.iter() {
                     child.paint(user_data, painter);
@@ -325,12 +337,8 @@ impl WidgetTree {
                     panic!("View widget is None when querying rect");
                 }
             }
-            WidgetTreeInner::Widget(ref w) => {
-                w.allocation.unwrap()
-            },
-            WidgetTreeInner::Layout(ref layout) => {
-                layout.allocation.unwrap()
-            }
+            WidgetTreeInner::Widget(ref w) => w.allocation.unwrap(),
+            WidgetTreeInner::Layout(ref layout) => layout.allocation.unwrap(),
         }
     }
 
@@ -346,11 +354,13 @@ impl WidgetTree {
             }
             WidgetTreeInner::Widget(ref mut w) => {
                 w.allocation = Some(rect);
-            },
+            }
             WidgetTreeInner::Layout(ref mut layout) => {
                 layout.allocation = Some(rect);
                 // TODO pass rect origin, probably encapsulate it in a layout context
-                layout.layout.layout(layout.children.as_mut_slice(), rect.size);
+                layout
+                    .layout
+                    .layout(layout.children.as_mut_slice(), rect.size);
             }
         }
     }
@@ -365,9 +375,7 @@ impl WidgetTree {
                     panic!("View widget is None when querying size hint");
                 }
             }
-            WidgetTreeInner::Widget(ref w) => {
-                w.widget.size_hint(w.children.as_slice())
-            },
+            WidgetTreeInner::Widget(ref w) => w.widget.size_hint(w.children.as_slice()),
             WidgetTreeInner::Layout(ref layout) => {
                 layout.layout.size_hint(layout.children.as_slice())
             }
@@ -376,15 +384,9 @@ impl WidgetTree {
 
     fn obj_mut(&mut self) -> &mut dyn Any {
         match self.inner {
-            WidgetTreeInner::View(ref mut view) => {
-                panic!()
-            }
-            WidgetTreeInner::Widget(ref mut w) => {
-                w.widget.as_any_mut()
-            },
-            WidgetTreeInner::Layout(ref mut layout) => {
-                panic!()
-            }
+            WidgetTreeInner::View(_) => panic!(),
+            WidgetTreeInner::Widget(ref mut w) => w.widget.as_any_mut(),
+            WidgetTreeInner::Layout(_) => panic!(),
         }
     }
 }
@@ -415,21 +417,17 @@ pub trait Layout {
 
 pub struct WidgetCache {
     factory: WidgetTreeFactory,
-    cached: HashMap<WidgetKey, WidgetTree>
+    cached: HashMap<WidgetKey, WidgetTree>,
 }
 
 impl WidgetCache {
     pub fn build<D: Description>(&mut self, desc: D) -> WidgetTree {
         match desc.key().and_then(|key| self.cached.remove(&key)) {
-            Some(mut widget) => {
-                match desc.apply(widget.obj_mut()) {
-                    Ok(()) => widget,
-                    Err(desc) => desc.create(self)
-                }
-            }
-            None => {
-                desc.create(self)
-            }
+            Some(mut widget) => match desc.apply(widget.obj_mut()) {
+                Ok(()) => widget,
+                Err(desc) => desc.create(self),
+            },
+            None => desc.create(self),
         }
     }
 
@@ -449,7 +447,7 @@ pub struct ViewRefs {
 impl ViewRefs {
     pub fn new() -> ViewRefs {
         ViewRefs {
-            inner: Mutex::new(Vec::new())
+            inner: Mutex::new(Vec::new()),
         }
     }
 

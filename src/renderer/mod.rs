@@ -1,14 +1,13 @@
-
-use winit::window::Window;
-use wgpu::util::StagingBelt;
-use crate::renderer::painter::Painter;
-use crate::renderer::quad::QuadPipeline;
 use futures::executor::LocalPool;
 use futures::task::LocalSpawnExt;
+use wgpu::util::StagingBelt;
+use winit::window::Window;
+
+use crate::renderer::painter::Painter;
+use crate::renderer::quad::QuadPipeline;
 
 pub mod painter;
 mod quad;
-
 
 pub struct Renderer {
     surface: wgpu::Surface,
@@ -29,21 +28,25 @@ impl Renderer {
 
         let instance = wgpu::Instance::new(wgpu::BackendBit::VULKAN);
         let surface = unsafe { instance.create_surface(window) };
-        let adapter = instance.request_adapter(
-            &wgpu::RequestAdapterOptions {
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::Default,
                 compatible_surface: Some(&surface),
-            },
-        ).await.unwrap();
+            })
+            .await
+            .unwrap();
 
-        let (device, queue) = adapter.request_device(
-            &wgpu::DeviceDescriptor {
-                features: wgpu::Features::empty(),
-                limits: wgpu::Limits::default(),
-                shader_validation: true,
-            },
-            None, // Trace path
-        ).await.unwrap();
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    features: wgpu::Features::empty(),
+                    limits: wgpu::Limits::default(),
+                    shader_validation: true,
+                },
+                None, // Trace path
+            )
+            .await
+            .unwrap();
 
         let sc_desc = wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
@@ -80,38 +83,42 @@ impl Renderer {
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
     }
 
-    pub fn render<F: for<'a> FnOnce(&'a mut Painter<'a>)>(&mut self, scale_factor: f64, render_func: F)
-        -> Result<(), wgpu::SwapChainError> {
-        let frame = self
-            .swap_chain
-            .get_current_frame()?
-            .output;
+    pub fn render<F: for<'a> FnOnce(&'a mut Painter<'a>)>(
+        &mut self,
+        scale_factor: f64,
+        render_func: F,
+    ) -> Result<(), wgpu::SwapChainError> {
+        let frame = self.swap_chain.get_current_frame()?.output;
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Render Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
 
-        render_func(&mut Painter::new(self, &mut encoder, self.size.to_logical::<f32>(scale_factor).into()));
+        render_func(&mut Painter::new(
+            self,
+            &mut encoder,
+            self.size.to_logical::<f32>(scale_factor).into(),
+        ));
 
         self.belt.finish();
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                color_attachments: &[
-                    wgpu::RenderPassColorAttachmentDescriptor {
-                        attachment: &frame.view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: 0.0,
-                                g: 0.0,
-                                b: 0.0,
-                                a: 1.0,
-                            }),
-                            store: true,
-                        }
-                    }
-                ],
+                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &frame.view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: 1.0,
+                        }),
+                        store: true,
+                    },
+                }],
                 depth_stencil_attachment: None,
             });
             self.quad.record(&mut render_pass);
