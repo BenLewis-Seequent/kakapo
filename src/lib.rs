@@ -5,3 +5,6 @@ pub mod geom;
 mod renderer;
 pub mod widgets;
 mod events;
+mod description;
+
+pub use description::Description;

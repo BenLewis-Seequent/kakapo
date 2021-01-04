@@ -87,13 +87,13 @@ impl View for AppView {
     fn view(&mut self, cache: &mut WidgetCache, user_data: UserData<'_>) -> WidgetTree {
         println!("View!");
         let data = user_data.unwrap().downcast_ref::<AppData>().unwrap();
-        let mut b = widgets::Box::new();
-        b.append(widgets::Button::new(if data.two_buttons {[0.0, 1.0, 0.0, 1.0]} else {[1.0, 0.0, 0.0, 1.0]}, PrimaryButtonDelegate))
+        let mut b = widgets::Box::new()
+            .append(widgets::Button::new(if data.two_buttons {[0.0, 1.0, 0.0, 1.0]} else {[1.0, 0.0, 0.0, 1.0]}, PrimaryButtonDelegate))
             .append(widgets::Button::new(secondary_button_colour(&data.shared_state.first), SecondaryButtonDelegate(true)));
         if data.two_buttons {
-            b.append(widgets::Button::new(secondary_button_colour(&data.shared_state.second), SecondaryButtonDelegate(false)));
+            b = b.append(widgets::Button::new(secondary_button_colour(&data.shared_state.second), SecondaryButtonDelegate(false)));
         }
-        cache.build(&b)
+        cache.build(b)
     }
 }
 

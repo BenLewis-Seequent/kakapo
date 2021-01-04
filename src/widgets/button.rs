@@ -1,36 +1,50 @@
 use std::any::Any;
 
-use crate::view::{Description, WidgetTree, Widget, WidgetCache, WidgetState, WidgetStateMut, UserDataMut};
+use crate::view::{WidgetTree, Widget, WidgetCache, WidgetState, WidgetStateMut, UserDataMut, WidgetKey};
 use crate::renderer::painter::Painter;
 use crate::geom::Size;
 use crate::events::Event;
+use crate::Description;
 
-// TODO remove copy bound
-pub trait ButtonDelegate : Copy {
+pub trait ButtonDelegate {
     fn pressed(&mut self, parent: UserDataMut<'_>);
 }
 
 pub struct Button<D: ButtonDelegate + 'static> {
     colour: [f32; 4],
-    delegate: D
+    delegate: D,
+    key: WidgetKey,
 }
 
 impl<D: ButtonDelegate + 'static> Button<D> {
+    #[track_caller]
     pub fn new(colour: [f32; 4], delegate: D) -> Self {
         Button {
             colour,
-            delegate
+            delegate,
+            key: WidgetKey::caller(),
         }
     }
 }
 
 impl<D: ButtonDelegate + 'static> Description for Button<D> {
-    fn apply(&self, obj: &mut dyn Any) {
-
+    fn key(&self) -> Option<WidgetKey> {
+        Some(self.key)
     }
 
-    fn create(&self, cache: &mut WidgetCache) -> WidgetTree {
-        cache.factory().new_widget(ButtonWidget {
+    fn apply(self, obj: &mut dyn Any) -> Result<(), Self> {
+        match obj.downcast_mut::<ButtonWidget<D>>() {
+            Some(widget) => {
+                widget.colour = self.colour;
+                widget.delegate = self.delegate;
+                Ok(())
+            }
+            None => Err(self)
+        }
+    }
+
+    fn create(self, cache: &mut WidgetCache) -> WidgetTree {
+        cache.factory().new_widget(self.key, ButtonWidget {
             colour: self.colour,
             delegate: self.delegate
         })
@@ -43,7 +57,7 @@ struct ButtonWidget<D: ButtonDelegate> {
     delegate: D
 }
 
-impl<D: ButtonDelegate> Widget for ButtonWidget<D> {
+impl<D: ButtonDelegate + 'static> Widget for ButtonWidget<D> {
     fn event(&mut self, mut state: WidgetStateMut<'_>, event: Event) {
         match event {
             Event::MousePress(_) => {
