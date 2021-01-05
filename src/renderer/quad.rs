@@ -26,6 +26,12 @@ pub(super) struct QuadPipeline {
     number_of_quads: u32,
 }
 
+macro_rules! shader {
+    ($device:expr, $spv:tt) => {
+        $device.create_shader_module(wgpu::include_spirv!(concat!(env!("OUT_DIR"), "/", $spv)))
+    };
+}
+
 impl QuadPipeline {
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> QuadPipeline {
         let render_pipeline_layout =
@@ -35,8 +41,8 @@ impl QuadPipeline {
                 push_constant_ranges: &[],
             });
 
-        let vs_module = device.create_shader_module(wgpu::include_spirv!("quad.vert.spv"));
-        let fs_module = device.create_shader_module(wgpu::include_spirv!("quad.frag.spv"));
+        let vs_module = shader!(device, "quad.vert.spv");
+        let fs_module = shader!(device, "quad.frag.spv");
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render Pipeline"),

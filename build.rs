@@ -1,5 +1,5 @@
 use std::fs::{read_to_string, write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::*;
 use glob::glob;
@@ -12,7 +12,7 @@ struct ShaderData {
 }
 
 impl ShaderData {
-    pub fn load(src_path: PathBuf) -> Result<Self> {
+    pub fn load(src_path: PathBuf, out_path: &Path) -> Result<Self> {
         let extension = src_path
             .extension()
             .context("File has no extension")?
@@ -26,7 +26,9 @@ impl ShaderData {
         };
 
         let src = read_to_string(src_path.clone())?;
-        let spv_path = src_path.with_extension(format!("{}.spv", extension));
+        let spv_path = out_path
+            .join(src_path.file_name().unwrap())
+            .with_extension(format!("{}.spv", extension));
 
         Ok(Self {
             src,
@@ -38,6 +40,8 @@ impl ShaderData {
 }
 
 fn main() -> Result<()> {
+    let out_dir: PathBuf = std::env::var_os("OUT_DIR").unwrap().into();
+
     // Collect all shaders recursively within /src/
     let mut shader_paths = [
         glob("./src/**/*.vert")?,
@@ -49,7 +53,7 @@ fn main() -> Result<()> {
     let shaders = shader_paths
         .iter_mut()
         .flatten()
-        .map(|glob_result| ShaderData::load(glob_result?))
+        .map(|glob_result| ShaderData::load(glob_result?, out_dir.as_path()))
         .collect::<Vec<Result<_>>>()
         .into_iter()
         .collect::<Result<Vec<_>>>()?;
