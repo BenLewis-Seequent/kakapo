@@ -7,6 +7,7 @@ use crate::view::{
     UserDataMut, Widget, WidgetCache, WidgetKey, WidgetState, WidgetStateMut, WidgetTree,
 };
 use crate::Description;
+use glyph_brush::Text;
 
 pub trait ButtonDelegate {
     fn pressed(&mut self, parent: UserDataMut<'_>);
@@ -71,6 +72,7 @@ impl<D: ButtonDelegate + 'static> Widget for ButtonWidget<D> {
 
     fn paint(&self, state: WidgetState<'_>, painter: &mut Painter) {
         painter.paint_quad(state.local_rect(), self.colour);
+        painter.paint_text(wgpu_glyph::Section::new().add_text(Text::new("Hello")))
     }
 
     fn size_hint(&self, _: &[WidgetTree]) -> Size {

@@ -5,9 +5,11 @@ use winit::window::Window;
 
 use crate::renderer::painter::Painter;
 use crate::renderer::quad::QuadPipeline;
+use crate::renderer::text::TextPipeline;
 
 pub mod painter;
 mod quad;
+mod text;
 
 pub struct Renderer {
     surface: wgpu::Surface,
@@ -18,6 +20,7 @@ pub struct Renderer {
     size: winit::dpi::PhysicalSize<u32>,
 
     quad: quad::QuadPipeline,
+    text: text::TextPipeline,
     belt: StagingBelt,
     pool: LocalPool,
 }
@@ -57,7 +60,8 @@ impl Renderer {
         };
         let swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
-        let pipeline = QuadPipeline::new(&device, sc_desc.format);
+        let quad = QuadPipeline::new(&device, sc_desc.format);
+        let text = TextPipeline::new(&device, sc_desc.format);
 
         Self {
             surface,
@@ -66,7 +70,8 @@ impl Renderer {
             sc_desc,
             swap_chain,
             size,
-            quad: pipeline,
+            quad,
+            text,
             belt: StagingBelt::new(0x100),
             pool: LocalPool::new(),
         }
@@ -100,9 +105,8 @@ impl Renderer {
             self,
             &mut encoder,
             self.size.to_logical::<f32>(scale_factor).into(),
+            scale_factor
         ));
-
-        self.belt.finish();
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -123,6 +127,16 @@ impl Renderer {
             });
             self.quad.record(&mut render_pass);
         }
+
+        self.text.record(
+            &self.device,
+            &mut self.belt,
+            &mut encoder,
+            &frame,
+            self.size,
+        );
+
+        self.belt.finish();
 
         // submit will accept anything that implements IntoIter
         self.queue.submit(std::iter::once(encoder.finish()));

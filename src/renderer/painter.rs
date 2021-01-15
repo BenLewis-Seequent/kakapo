@@ -5,6 +5,7 @@ pub struct Painter<'a> {
     renderer: &'a mut Renderer,
     encoder: &'a mut wgpu::CommandEncoder,
     viewport_size: Size,
+    scale: f64,
     origin: Position,
 }
 
@@ -13,12 +14,14 @@ impl<'a> Painter<'a> {
         renderer: &'a mut Renderer,
         encoder: &'a mut wgpu::CommandEncoder,
         viewport_size: Size,
+        scale: f64,
     ) -> Self {
         renderer.quad.reset();
         Painter {
             renderer,
             encoder,
             viewport_size,
+            scale,
             origin: Position::zero(),
         }
     }
@@ -50,11 +53,18 @@ impl<'a> Painter<'a> {
         );
     }
 
+    pub fn paint_text(&mut self, mut section: wgpu_glyph::Section<'_>)  {
+        section.screen_position = (section.screen_position.0 + self.origin.x * self.scale as f32,
+                                   section.screen_position.1 + self.origin.y * self.scale as f32);
+        self.renderer.text.add_text(section);
+    }
+
     pub fn with_rect(&mut self, rect: Rect) -> Painter<'_> {
         Painter {
             renderer: self.renderer,
             encoder: self.encoder,
             viewport_size: self.viewport_size,
+            scale: self.scale,
             origin: self.origin + rect.origin,
         }
     }
