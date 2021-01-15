@@ -105,7 +105,7 @@ impl Renderer {
             self,
             &mut encoder,
             self.size.to_logical::<f32>(scale_factor).into(),
-            scale_factor
+            scale_factor,
         ));
 
         {

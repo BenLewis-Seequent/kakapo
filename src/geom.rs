@@ -47,6 +47,12 @@ impl Sub for Position {
     }
 }
 
+impl From<Position> for (Scalar, Scalar) {
+    fn from(position: Position) -> Self {
+        (position.x, position.y)
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Size {
     pub width: Scalar,
@@ -94,9 +100,16 @@ impl Rect {
             && position.y < self.origin.y + self.size.height
     }
 
-    pub fn center(&self, size: Size) -> Rect {
+    pub fn center_aligned(&self, size: Size) -> Rect {
         let dx = (self.size.width - size.width) / 2.0;
         let dy = (self.size.height - size.height) / 2.0;
         Rect::new(Position::new(self.origin.x + dx, self.origin.y + dy), size)
+    }
+
+    pub fn center(&self) -> Position {
+        Position::new(
+            self.origin.x + self.size.width / 2.0,
+            self.origin.y + self.size.height / 2.0,
+        )
     }
 }

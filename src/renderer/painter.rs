@@ -53,9 +53,11 @@ impl<'a> Painter<'a> {
         );
     }
 
-    pub fn paint_text(&mut self, mut section: wgpu_glyph::Section<'_>)  {
-        section.screen_position = (section.screen_position.0 + self.origin.x * self.scale as f32,
-                                   section.screen_position.1 + self.origin.y * self.scale as f32);
+    pub fn paint_text(&mut self, mut section: wgpu_glyph::Section<'_>) {
+        section.screen_position = (
+            (section.screen_position.0 + self.origin.x) * self.scale as f32,
+            (section.screen_position.1 + self.origin.y) * self.scale as f32,
+        );
         self.renderer.text.add_text(section);
     }
 

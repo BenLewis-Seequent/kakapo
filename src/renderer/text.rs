@@ -8,10 +8,11 @@ pub(super) struct TextPipeline {
 
 impl TextPipeline {
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> TextPipeline {
-        let font = wgpu_glyph::ab_glyph::FontArc::try_from_slice(include_bytes!("Roboto-Regular.ttf")).unwrap();
+        let font =
+            wgpu_glyph::ab_glyph::FontArc::try_from_slice(include_bytes!("Roboto-Regular.ttf"))
+                .unwrap();
 
-        let glyph_brush =
-            wgpu_glyph::GlyphBrushBuilder::using_font(font).build(device, format);
+        let glyph_brush = wgpu_glyph::GlyphBrushBuilder::using_font(font).build(device, format);
 
         TextPipeline { glyph_brush }
     }

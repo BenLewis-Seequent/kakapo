@@ -83,23 +83,32 @@ impl View for AppView {
         println!("View!");
         let data = user_data.unwrap().downcast_ref::<AppData>().unwrap();
         let mut b = widgets::Box::new()
-            .append(widgets::Button::new(
-                if data.two_buttons {
-                    [0.0, 1.0, 0.0, 1.0]
-                } else {
-                    [1.0, 0.0, 0.0, 1.0]
-                },
-                PrimaryButtonDelegate,
-            ))
-            .append(widgets::Button::new(
-                secondary_button_colour(&data.shared_state.first),
-                SecondaryButtonDelegate(true),
-            ));
+            .append(
+                widgets::Button::new(
+                    if data.two_buttons {
+                        [0.0, 1.0, 0.0, 1.0]
+                    } else {
+                        [1.0, 0.0, 0.0, 1.0]
+                    },
+                    PrimaryButtonDelegate,
+                )
+                .add_text(&wgpu_glyph::Text::new("Primary")),
+            )
+            .append(
+                widgets::Button::new(
+                    secondary_button_colour(&data.shared_state.first),
+                    SecondaryButtonDelegate(true),
+                )
+                .add_text(&wgpu_glyph::Text::new("A")),
+            );
         if data.two_buttons {
-            b = b.append(widgets::Button::new(
-                secondary_button_colour(&data.shared_state.second),
-                SecondaryButtonDelegate(false),
-            ));
+            b = b.append(
+                widgets::Button::new(
+                    secondary_button_colour(&data.shared_state.second),
+                    SecondaryButtonDelegate(false),
+                )
+                .add_text(&wgpu_glyph::Text::new("B")),
+            );
         }
         cache.build(b)
     }
